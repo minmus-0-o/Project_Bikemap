@@ -25,13 +25,12 @@
 <body>
     <aside class="sidebar">
         <h3>Панель управления</h3>
-        {% if not user %}
-        <h3>ААААА</h3>
+        {% if user %}
+        <p>Привет <a>{{ user.username }}</a>!</p>
+        <a href="/logout"><button>Выйти</button></a>
+        {% else %}
         <a href="/register"><button>Зарегистрироваться</button></a>
         <a href="/login"><button>Войти</button></a>
-        {% else %}
-        <h3>ААААА</h3>
-        <a href="/logout"><button>Выйти</button></a>
         {% endif %}
     </aside>
     <div id = "map"></div>
