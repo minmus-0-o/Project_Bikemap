@@ -12,7 +12,7 @@
 
         .sidebar {
             position: absolute;
-            top: 10px; left: 10px; bottom: 75%;
+            top: 10px; left: 10px; bottom: 50%;
             width: 340px;
             background: #9ffff1;
             z-index: 1000;
@@ -69,6 +69,15 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '&copy; OpenStreetMap contributors',
 }).addTo(map);
 
+map.on('click', function(e) {
+    // Проверяем, нажал ли пользователь на карту, а не на маркер 
+    // (Leaflet сам управляет всплытием событий, так что это сработает)
+    if (currentTrack) {
+        map.removeLayer(currentTrack);
+        currentTrack = null; // Обнуляем переменную, чтобы скрипт знал, что трека нет
+    }
+});
+
 async function loadRides() {
     const date = document.getElementById('filter-date').value;
     if (!date) return;
@@ -80,13 +89,17 @@ async function loadRides() {
     const rides = await response.json();
 
     rides.forEach(ride => {
-        // Передаем путь к файлу в функцию клика
+        // 1. Создаем маркер
         const marker = L.marker([ride.lat, ride.lon])
-            .bindPopup(`
-                <b>${ride.title}</b><br>
-                <button onclick="showTrack('${ride.gpx_path}')">Показать маршрут</button>
-            `)
             .addTo(markersGroup);
+
+        // 2. Добавляем всплывающее окно (теперь просто с названием)
+        marker.bindPopup(`<b>${ride.title}</b>`);
+
+        // 3. Добавляем магию: рисование трека ПРИ КЛИКЕ на маркер
+        marker.on('click', function() {
+            showTrack(ride.gpx_path);
+        });
     });
 }
 
