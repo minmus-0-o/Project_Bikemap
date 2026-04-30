@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine, Column, Integer, String
+from sqlalchemy import create_engine, Column, Integer, String, Date, ForeignKey
 from sqlalchemy.orm import sessionmaker, declarative_base
 
 URL_DATABASE = "sqlite:///.velo_tour.db"
@@ -15,3 +15,15 @@ class User(Base):
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String, unique=True)
     password = Column(String)
+
+class Ride(Base):
+    __tablename__ = "rides"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    title = Column(String)
+    ride_date = Column(Date)
+    gpx_file = Column(String)
+    start_lat = Column(Integer)
+    start_lon = Column(Integer)
+    
+    user_id = Column(Integer, ForeignKey("users.id"))

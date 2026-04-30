@@ -1,8 +1,13 @@
-from fastapi import FastAPI, Request, Form, Depends, Cookie, Response
+from fastapi import FastAPI, Request, Form, Depends, Cookie, Response, UploadFile, File 
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 from passlib.context import CryptContext
+import shutil
+import os
+import gpxpy
+from datetime import datetime
 
 import database
 
@@ -10,9 +15,23 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 app = FastAPI()
 
+app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+
 database.Base.metadata.create_all(bind=database.engine)
 
 templates = Jinja2Templates(directory="templates")
+
+def get_gpx_start_point(file_path):
+    with open(file_path, 'r') as gpx_file:
+        gpx = gpxpy.parse(gpx_file)
+        if gpx.tracks:
+            first_track = gpx.tracks[0]
+            if first_track.segments:
+                first_segment = first_track.segments[0]
+                if first_segment.points:
+                    first_point = first_segment.points[0]
+                    return first_point.latitude, first_point.longitude
+    return None, None
 
 def get_db():
     db = database.SessionLocal()
@@ -79,3 +98,59 @@ def get_logout():
     response = RedirectResponse(url="/", status_code=303)
     response.delete_cookie("user_id")
     return response
+
+if not os.path.exists("uploads"):
+    os.makedirs("uploads")
+
+@app.post("/upload_gpx")
+async def upload_gpx(
+    title: str = Form(...),
+    ride_date: str = Form(...),
+    gpx_file: UploadFile = File(...),
+    user_id: str = Cookie(None),
+    db: Session = Depends(get_db)
+):
+    if not user_id:
+        return "Ошибка: Вы должны быть авторизованы"
+
+    file_path = f"uploads/{gpx_file.filename}"
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(gpx_file.file, buffer)
+    
+    lat, lon = get_gpx_start_point(file_path)
+    
+    if lat is None:
+        return "Ошибка: Не удалось найти координаты в GPX файле"
+
+    date_obj = datetime.strptime(ride_date, "%Y-%m-%d").date()
+    
+    new_ride = database.Ride(
+        title=title,
+        ride_date=date_obj,
+        gpx_file=file_path,
+        start_lat=lat,
+        start_lon=lon,
+        user_id=int(user_id)
+    )
+    
+    db.add(new_ride)
+    db.commit()
+    
+    return RedirectResponse(url="/", status_code=303)
+
+@app.get("/get_rides")
+def get_rides(date: str, db: Session = Depends(get_db)):
+
+    target_date = datetime.strptime(date, "%Y-%m-%d").date()
+    
+    rides = db.query(database.Ride).filter(database.Ride.ride_date == target_date).all()
+
+    return [
+        {
+            "id": r.id,
+            "title": r.title,
+            "lat": r.start_lat,
+            "lon": r.start_lon,
+            "gpx_path": r.gpx_file
+        } for r in rides
+    ]
