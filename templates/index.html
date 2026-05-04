@@ -42,6 +42,10 @@
             <label>Название маршрута: 
                 <input type="text" name="title" required>
             </label><br>
+
+            <label>Описание маршрута: 
+                <textarea name="description" rows="3"></textarea>
+            </label><br>
         
             <label>Дата заезда: 
                 <input type="date" name="ride_date" required>
@@ -89,18 +93,28 @@ async function loadRides() {
     const rides = await response.json();
 
     rides.forEach(ride => {
-        // 1. Создаем маркер
-        const marker = L.marker([ride.lat, ride.lon])
-            .addTo(markersGroup);
+    const marker = L.marker([ride.lat, ride.lon]).addTo(markersGroup);
 
-        // 2. Добавляем всплывающее окно (теперь просто с названием)
-        marker.bindPopup(`<b>${ride.title}</b>`);
+    // Формируем содержимое балуна
+    const popupContent = `
+        <div style="max-width: 200px">
+            <b style="font-size: 1.1em">${ride.title}</b><br>
+            <p style="margin-top: 5px; color: #555; font-size: 0.9em;">${ride.description}</p>
+            <hr style="border: 0; border-top: 1px solid #eee; margin: 10px 0;">
+            <a href="${ride.gpx_path}" download="${ride.title}.gpx" style="text-decoration: none;">
+                <button style="width: 100%; cursor: pointer; background-color: #4CAF50; color: white; border: none; padding: 5px; border-radius: 4px;">
+                    Скачать маршрут
+                </button>
+            </a>
+        </div>
+    `;
 
-        // 3. Добавляем магию: рисование трека ПРИ КЛИКЕ на маркер
-        marker.on('click', function() {
-            showTrack(ride.gpx_path);
-        });
+    marker.bindPopup(popupContent);
+
+    marker.on('click', function() {
+        showTrack(ride.gpx_path);
     });
+});
 }
 
 function showTrack(gpxUrl) {

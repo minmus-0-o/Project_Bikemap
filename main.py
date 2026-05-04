@@ -107,6 +107,7 @@ async def upload_gpx(
     title: str = Form(...),
     ride_date: str = Form(...),
     gpx_file: UploadFile = File(...),
+    description: str = Form(None),
     user_id: str = Cookie(None),
     db: Session = Depends(get_db)
 ):
@@ -127,6 +128,7 @@ async def upload_gpx(
     new_ride = database.Ride(
         title=title,
         ride_date=date_obj,
+        description=description,
         gpx_file=file_path,
         start_lat=lat,
         start_lon=lon,
@@ -149,6 +151,7 @@ def get_rides(date: str, db: Session = Depends(get_db)):
         {
             "id": r.id,
             "title": r.title,
+            "description": r.description or "",
             "lat": r.start_lat,
             "lon": r.start_lon,
             "gpx_path": r.gpx_file
