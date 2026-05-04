@@ -1,0 +1,22 @@
+/* Делаем маркеры и линии более современными */
+.leaflet-container {
+    background: #f8fafc !important; /* Цвет фона под картой */
+}
+
+/* Стилизация балуна под iOS */
+.leaflet-popup-content-wrapper {
+    border-radius: 24px !important;
+    background: rgba(255, 255, 255, 0.8) !important;
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1) !important;
+}
+
+/* Стили для скроллбара внутри сайдбара */
+aside::-webkit-scrollbar {
+    width: 4px;
+}
+aside::-webkit-scrollbar-thumb {
+    background: rgba(0,0,0,0.05);
+    border-radius: 10px;
+}

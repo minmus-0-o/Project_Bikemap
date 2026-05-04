@@ -16,6 +16,7 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 app = FastAPI()
 
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 database.Base.metadata.create_all(bind=database.engine)
 
@@ -64,7 +65,7 @@ def register_user(
     db: Session = Depends(get_db)
 ):
     hashed_password = pwd_context.hash(password)
-    new_user = database.User(username=username, password=hashed_password)
+    new_user = database.User(username=username, hashed_password=hashed_password)
 
     db.add(new_user)
     db.commit()
@@ -86,7 +87,7 @@ def login_user(
 ):
     user = db.query(database.User).filter(database.User.username == username).first()
 
-    if not user or not pwd_context.verify(password, user.password):
+    if not user or not pwd_context.verify(password, user.hashed_password):
         return "Неверные данные"
     
     response = RedirectResponse(url="/", status_code=303)
@@ -105,9 +106,9 @@ if not os.path.exists("uploads"):
 @app.post("/upload_gpx")
 async def upload_gpx(
     title: str = Form(...),
-    ride_date: str = Form(...),
-    gpx_file: UploadFile = File(...),
     description: str = Form(None),
+    ride_date: str = Form(...),
+    gpx_file: UploadFile = File(...), # Имя переменной должно быть gpx_file
     user_id: str = Cookie(None),
     db: Session = Depends(get_db)
 ):
@@ -157,3 +158,18 @@ def get_rides(date: str, db: Session = Depends(get_db)):
             "gpx_path": r.gpx_file
         } for r in rides
     ]
+
+@app.get("/get_user_info")
+def get_user_info(user_id: str = Cookie(None), db: Session = Depends(get_db)):
+    if not user_id:
+        return {"error": "Not authorized"}
+    
+    user = db.query(database.User).filter(database.User.id == int(user_id)).first()
+    if user:
+        return {
+            "username": user.username,
+            # Вместо user.is_community используй getattr
+            "role": "Велосообщество" if getattr(user, 'is_community', False) else "Райдер",
+            "avatar": user.avatar_url or "https://api.dicebear.com/7.x/avataaars/svg?seed=" + user.username
+        }
+    return {"error": "User not found"}

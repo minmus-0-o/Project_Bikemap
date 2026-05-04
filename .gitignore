@@ -1,2 +1,7 @@
 velo_tour.db
 uploads/
+__pycache__/
+*.py[cod]
+*.db
+.pytest_cache/
+.venv/

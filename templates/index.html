@@ -4,6 +4,8 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet-gpx/1.7.0/gpx.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/static/style.css">
     <style>
         body {
             margin: 0;
@@ -23,123 +25,201 @@
         }
     </style>
 </head>
-<body>
-    <aside class="sidebar">
-        <h3>Панель управления</h3>
-        <div class="filter-section">
-            <h4>Поиск заездов</h4>
-            <label>Выберите дату: 
-                <input type="date" id="filter-date" onchange="loadRides()">
-            </label>
-        </div>
-        <hr>
-        {% if user %}
-        <p>Привет <a>{{ user.username }}</a>!</p>
-        <a href="/logout"><button>Выйти</button></a>
-        <section class="upload-ride">
-            <h3>Добавить новый велозаезд</h3>
-            <form action="/upload_gpx" method="post" enctype="multipart/form-data">
-            <label>Название маршрута: 
-                <input type="text" name="title" required>
-            </label><br>
+<body class="bg-gray-100 font-sans antialiased text-slate-800">
 
-            <label>Описание маршрута: 
-                <textarea name="description" rows="3"></textarea>
-            </label><br>
+    <!-- Карта на заднем плане -->
+    <div id="map" class="fixed inset-0 z-0"></div>
+
+    <!-- Основной контейнер интерфейса -->
+    <main class="relative z-10 flex h-screen p-4 pointer-events-none">
         
-            <label>Дата заезда: 
-                <input type="date" name="ride_date" required>
-            </label><br>
-        
-            <label>Выберите GPX файл: 
-                <input type="file" name="gpx_file" accept=".gpx" required>
-            </label><br>
-        
-        <button type="submit">Загрузить маршрут</button>
+        <!-- Сайдбар с эффектом стекла -->
+        <aside class="w-80 flex flex-col gap-6 p-6 rounded-[2rem] bg-white/70 backdrop-blur-2xl shadow-[0_8px_32px_0_rgba(31,38,135,0.15)] border border-white/40 pointer-events-auto overflow-y-auto">
+            
+            <!-- Логотип -->
+            <div class="flex items-center gap-3 px-2">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-400 to-fuchsia-500 shadow-lg shadow-cyan-500/20 flex items-center justify-center">
+                    <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"></path></svg>
+                </div>
+                <span class="text-2xl font-black italic tracking-tighter uppercase text-slate-900">VELOCITY<span class="text-cyan-500">.</span></span>
+            </div>
+
+            <hr class="border-slate-200/50">
+
+            <!-- Фильтр по дате -->
+            <div class="space-y-2">
+                <label class="text-[10px] font-bold uppercase tracking-widest text-slate-400 px-2">Выберите дату</label>
+                <input type="date" id="filter-date" onchange="loadRides()" 
+                       class="w-full px-4 py-3 bg-white/50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-cyan-400 outline-none transition-all text-sm shadow-sm">
+            </div>
+
+            <!-- Контейнер для списка заездов или формы -->
+<!-- Контейнер для АВТОРИЗОВАННЫХ (скрыт по умолчанию) -->
+<div id="auth-section" class="hidden flex-1 flex flex-col gap-6">
+    <div class="space-y-4">
+        <label class="text-[10px] font-bold uppercase tracking-widest text-slate-400 px-2">Добавить трек</label>
+        <form action="/upload_gpx" method="post" enctype="multipart/form-data" class="space-y-3">
+            <input type="text" name="title" placeholder="Название" class="w-full px-4 py-3 bg-white/50 border border-slate-200 rounded-2xl text-sm outline-none focus:border-cyan-400 transition-colors">
+            <textarea name="description" placeholder="Описание" class="w-full px-4 py-3 bg-white/50 border border-slate-200 rounded-2xl text-sm outline-none focus:border-cyan-400 transition-colors resize-none"></textarea>
+            <div class="space-y-1">
+                <label class="text-[10px] font-bold text-slate-400 px-2 uppercase">Файл маршрута (.gpx)</label>
+                <input type="file" name="gpx_file" accept=".gpx" required 
+                    class="w-full px-4 py-2 bg-white/50 border border-slate-200 rounded-2xl text-xs file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-cyan-50 file:text-cyan-700 hover:file:bg-cyan-100">
+            </div>
+            <input type="date" name="ride_date" class="w-full px-4 py-3 bg-white/50 border border-slate-200 rounded-2xl text-sm outline-none">
+            <button type="submit" class="w-full py-4 bg-slate-900 text-white rounded-2xl font-bold text-sm shadow-xl hover:bg-cyan-500 transition-all uppercase tracking-wider">
+                Опубликовать
+            </button>
         </form>
-        </section>
-        {% else %}
-        <a href="/register"><button>Зарегистрироваться</button></a>
-        <a href="/login"><button>Войти</button></a>
-        {% endif %}
-    </aside>
-    <div id = "map"></div>
-    <script>
-    var map = L.map('map').setView([55.75, 37.61], 10);
-var markersGroup = L.layerGroup().addTo(map);
-var currentTrack = null; // Здесь будем хранить текущую линию маршрута
+    </div>
 
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '&copy; OpenStreetMap contributors',
-}).addTo(map);
-
-map.on('click', function(e) {
-    // Проверяем, нажал ли пользователь на карту, а не на маркер 
-    // (Leaflet сам управляет всплытием событий, так что это сработает)
-    if (currentTrack) {
-        map.removeLayer(currentTrack);
-        currentTrack = null; // Обнуляем переменную, чтобы скрипт знал, что трека нет
-    }
-});
-
-async function loadRides() {
-    const date = document.getElementById('filter-date').value;
-    if (!date) return;
-
-    markersGroup.clearLayers();
-    if (currentTrack) map.removeLayer(currentTrack); // Убираем старую линию
-
-    const response = await fetch(`/get_rides?date=${date}`);
-    const rides = await response.json();
-
-    rides.forEach(ride => {
-    const marker = L.marker([ride.lat, ride.lon]).addTo(markersGroup);
-
-    // Формируем содержимое балуна
-    const popupContent = `
-        <div style="max-width: 200px">
-            <b style="font-size: 1.1em">${ride.title}</b><br>
-            <p style="margin-top: 5px; color: #555; font-size: 0.9em;">${ride.description}</p>
-            <hr style="border: 0; border-top: 1px solid #eee; margin: 10px 0;">
-            <a href="${ride.gpx_path}" download="${ride.title}.gpx" style="text-decoration: none;">
-                <button style="width: 100%; cursor: pointer; background-color: #4CAF50; color: white; border: none; padding: 5px; border-radius: 4px;">
-                    Скачать маршрут
-                </button>
-            </a>
+    <!-- Юзер-бар с кнопкой выхода -->
+    <div class="mt-auto p-3 bg-slate-50/50 rounded-2xl border border-slate-100 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-full bg-gradient-to-br from-cyan-400 to-fuchsia-500 p-0.5 shadow-md">
+                <img id="user-avatar" src="https://api.dicebear.com/7.x/avataaars/svg?seed=Gleb" class="rounded-full bg-white">
+            </div>
+            <div class="flex flex-col">
+                <!-- Сюда JS подставит имя -->
+                <span id="user-name" class="text-xs font-bold text-slate-900 leading-none">Загрузка...</span>
+                <!-- Сюда JS подставит роль (Велосообщество или Райдер) -->
+                <span id="user-role" class="text-[10px] text-slate-400 font-medium mt-1"></span>
+            </div>
         </div>
-    `;
+        <button onclick="logout()" class="p-2 text-slate-400 hover:text-red-500 transition-all">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
+        </button>
+    </div>
+</div>
 
-    marker.bindPopup(popupContent);
+<!-- Контейнер для ГОСТЕЙ (скрыт по умолчанию) -->
+<div id="guest-section" class="hidden flex-1 flex flex-col justify-center items-center text-center p-6 space-y-4">
+    <div class="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center text-slate-400">
+        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
+    </div>
+    <p class="text-sm text-slate-500">Войдите, чтобы делиться своими маршрутами</p>
+    
+    <div class="w-full space-y-2">
+        <a href="/login" class="block w-full py-4 bg-slate-900 text-white rounded-2xl font-bold text-sm shadow-lg hover:bg-cyan-500 transition-all uppercase tracking-wider">
+            Войти
+        </a>
+        <a href="/register" class="block w-full py-4 bg-white border border-slate-200 text-slate-600 rounded-2xl font-bold text-sm hover:bg-slate-50 transition-all uppercase tracking-wider">
+            Регистрация
+        </a>
+    </div>
+</div>
+        </aside>
+    </main>
+    <script>
+        document.addEventListener('DOMContentLoaded', async function() {
+            try {
+                const response = await fetch('/get_user_info');
+                const data = await response.json();
 
-    marker.on('click', function() {
-        showTrack(ride.gpx_path);
-    });
-});
-}
-
-function showTrack(gpxUrl) {
-    // Если на карте уже есть линия — удаляем её
-    if (currentTrack) {
-        map.removeLayer(currentTrack);
-    }
-
-    // Рисуем новую линию из файла
-    currentTrack = new L.GPX(gpxUrl, {
-        async: true,
-        marker_options: {
-            startIconUrl: '', // Прячем стандартные иконки плагина, 
-            endIconUrl: '',   // чтобы не дублировать наш маркер
-            shadowUrl: ''
-        },
-        polyline_options: {
-            color: 'red',
-            weight: 5,
-            opacity: 0.7
+                if (data.error) {
+                    // Если сервер сказал "ошибка" или "не авторизован"
+                    document.getElementById('auth-section').classList.add('hidden');
+                    document.getElementById('guest-section').classList.remove('hidden');
+                } else {
+                    // Если пользователь реально найден в базе
+                    document.getElementById('auth-section').classList.remove('hidden');
+                    document.getElementById('guest-section').classList.add('hidden');
+                    
+                    document.getElementById('user-name').textContent = data.username;
+                    document.getElementById('user-role').textContent = data.role;
+                    document.getElementById('user-avatar').src = data.avatar;
+                }
+            } catch (err) {
+                // Если вообще нет связи с сервером — по умолчанию гость
+                document.getElementById('auth-section').classList.add('hidden');
+                document.getElementById('guest-section').classList.remove('hidden');
+            }
+        });
+                // 1. Ставим функцию ВЫШЕ всего остального
+        function logout() {
+            document.cookie = "user_id=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+            // Просто перезагружаем страницу, чтобы применилась логика "гостя"
+            window.location.reload(); 
         }
-    }).on('loaded', function(e) {
-        map.fitBounds(e.target.getBounds()); // Автоматически приближаем карту к маршруту
-    }).addTo(map);
-}
+        // 1. Глобальные переменные (должны быть в самом начале скрипта)
+        var map = L.map('map', { zoomControl: false }).setView([55.75, 37.61], 10);
+        L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+
+        var markersGroup = L.layerGroup().addTo(map);
+        var currentTrack = null; // Здесь будет храниться текущая линия маршрута
+
+        // 2. Функция для отрисовки трека (ТА САМАЯ, КОТОРОЙ НЕ ХВАТАЛО)
+        function showTrack(gpxUrl) {
+            // Если на карте уже есть какой-то маршрут — удаляем его
+            if (currentTrack) {
+                map.removeLayer(currentTrack);
+            }
+
+            // Создаем новый слой из GPX файла
+            currentTrack = new L.GPX(gpxUrl, {
+                async: true,
+                marker_options: {
+                    startIconUrl: null, // Убираем лишние иконки внутри трека
+                    endIconUrl: null,
+                    shadowUrl: null
+                },
+                polyline_options: {
+                    color: '#06b6d4', // Наш бирюзовый цвет из темы
+                    opacity: 0.8,
+                    weight: 5,
+                    lineCap: 'round'
+                }
+            }).on('loaded', function(e) {
+                map.fitBounds(e.target.getBounds(), { padding: [50, 50] });
+            }).addTo(map);
+        }
+
+        // 3. Загрузка маркеров
+        async function loadRides() {
+            const dateInput = document.getElementById('filter-date');
+            if (!dateInput.value) return;
+
+            const response = await fetch(`/get_rides?date=${dateInput.value}`);
+            const rides = await response.json();
+
+            markersGroup.clearLayers();
+
+            rides.forEach(ride => {
+                const marker = L.marker([ride.lat, ride.lon]).addTo(markersGroup);
+
+                const popupContent = `
+                    <div style="min-width: 180px; font-family: sans-serif;">
+                        <b style="font-size: 1rem; color: #0f172a;">${ride.title}</b>
+                        <p style="font-size: 0.8rem; color: #64748b; margin: 8px 0;">${ride.description || 'Без описания'}</p>
+                        <a href="${ride.gpx_path}" download="${ride.title}.gpx" style="text-decoration:none;">
+                            <button style="width: 100%; padding: 8px; background: linear-gradient(to right, #22d3ee, #d946ef); color: white; border: none; border-radius: 12px; cursor: pointer; font-weight: bold; font-size: 0.75rem;">
+                                СКАЧАТЬ GPX
+                            </button>
+                        </a>
+                    </div>
+                `;
+
+                marker.bindPopup(popupContent);
+
+                // При клике на маркер вызываем функцию showTrack
+                marker.on('click', function() {
+                    showTrack(ride.gpx_path);
+                });
+            });
+        }
+
+        // 4. Закрытие маршрута по клику на карту
+        map.on('click', function(e) {
+            // Проверяем, что клик не по маркеру
+            if (e.originalEvent.target.id === 'map' || e.originalEvent.target.tagName === 'path' === false) {
+                if (currentTrack) {
+                    map.removeLayer(currentTrack);
+                    currentTrack = null;
+                }
+            }
+        });
     </script>
 </body>
 </html>

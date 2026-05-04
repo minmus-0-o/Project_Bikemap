@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine, Column, Integer, String, Date, ForeignKey
+from sqlalchemy import Boolean, create_engine, Column, Integer, String, Date, ForeignKey
 from sqlalchemy.orm import sessionmaker, declarative_base
 
 URL_DATABASE = "sqlite:///.velo_tour.db"
@@ -11,10 +11,11 @@ Base = declarative_base()
 
 class User(Base):
     __tablename__ = "users"
-
     id = Column(Integer, primary_key=True, index=True)
-    username = Column(String, unique=True)
-    password = Column(String)
+    username = Column(String, unique=True, index=True)
+    hashed_password = Column(String)
+    avatar_url = Column(String, nullable=True)
+    is_community = Column(Boolean, default=False)
 
 class Ride(Base):
     __tablename__ = "rides"
