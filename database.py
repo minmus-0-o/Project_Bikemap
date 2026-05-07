@@ -1,4 +1,4 @@
-from sqlalchemy import Boolean, create_engine, Column, Integer, String, Date, ForeignKey
+from sqlalchemy import Boolean, create_engine, Column, Integer, String, Date, ForeignKey, Float
 from sqlalchemy.orm import sessionmaker, declarative_base
 
 URL_DATABASE = "sqlite:///.velo_tour.db"
@@ -25,7 +25,8 @@ class Ride(Base):
     description = Column(String, nullable=True)
     ride_date = Column(Date)
     gpx_file = Column(String)
-    start_lat = Column(Integer)
-    start_lon = Column(Integer)
+    start_lat = Column(Float)      # ← исправил с Integer на Float
+    start_lon = Column(Float)      # ← исправил
+    length = Column(Float, nullable=True)   # ← НОВОЕ ПОЛЕ (в метрах)
     
     user_id = Column(Integer, ForeignKey("users.id"))
