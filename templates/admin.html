@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Velocity | Админ-панель</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-950 text-slate-200 min-h-screen">
+    <div class="max-w-5xl mx-auto p-8">
+        <div class="flex justify-between items-center mb-8">
+            <h1 class="text-4xl font-black italic tracking-tighter uppercase">Админ-панель</h1>
+            <a href="/" class="text-cyan-400 hover:text-cyan-300 font-medium">← Вернуться на карту</a>
+        </div>
+
+        <div class="bg-slate-900 rounded-3xl p-6 border border-slate-700">
+            <h2 class="text-xl font-bold mb-4 text-slate-300">Заявки на статус «Велосообщество»</h2>
+            
+            <div id="requests-list" class="space-y-4">
+                <!-- Заполняется через JavaScript -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        console.log("Admin panel script loaded");
+
+        async function loadRequests() {
+            try {
+                const res = await fetch('/admin/requests', {
+                    credentials: 'include',
+                    headers: { 'Cache-Control': 'no-cache' }
+                });
+                const requests = await res.json();
+                console.log("Requests loaded:", requests);
+
+                const container = document.getElementById('requests-list');
+                container.innerHTML = '';
+
+                if (requests.length === 0) {
+                    container.innerHTML = `<p class="text-slate-400 text-center py-8">Нет активных заявок ✅</p>`;
+                    return;
+                }
+
+                requests.forEach(user => {
+                    const card = document.createElement('div');
+                    card.className = "bg-slate-800 rounded-2xl p-5 flex items-center justify-between";
+                    card.innerHTML = `
+                        <div>
+                            <div class="font-semibold text-lg">${user.username}</div>
+                        </div>
+                        <div class="flex gap-3">
+                            <button onclick="approve(${user.id})" class="px-6 py-3 bg-emerald-600 hover:bg-emerald-500 rounded-xl font-medium transition">
+                                Одобрить
+                            </button>
+                            <button onclick="reject(${user.id})" class="px-6 py-3 bg-red-600 hover:bg-red-500 rounded-xl font-medium transition">
+                                Отклонить
+                            </button>
+                        </div>
+                    `;
+                    container.appendChild(card);
+                });
+            } catch (e) {
+                console.error("Load requests error:", e);
+            }
+        }
+
+        async function approve(userId) {
+            console.log("Approving user:", userId);
+            try {
+                const res = await fetch(`/admin/approve/${userId}`, {
+                    method: 'POST',
+                    credentials: 'include'
+                });
+                const result = await res.json();
+                console.log("Approve result:", result);
+                
+                if (res.ok) {
+                    alert("✅ Пользователь успешно одобрен!");
+                    loadRequests();
+                } else {
+                    alert("Ошибка одобрения");
+                }
+            } catch (e) {
+                console.error(e);
+                alert("Ошибка соединения");
+            }
+        }
+
+        async function reject(userId) {
+            if (!confirm("Отклонить пользователя?")) return;
+            const res = await fetch(`/admin/reject/${userId}`, { 
+                method: 'POST', 
+                credentials: 'include' 
+            });
+            if (res.ok) {
+                alert("Пользователь отклонён");
+                loadRequests();
+            }
+        }
+
+        window.onload = loadRequests;
+    </script>
+</body>
+</html>

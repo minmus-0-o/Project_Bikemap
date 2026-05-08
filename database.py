@@ -15,7 +15,11 @@ class User(Base):
     username = Column(String, unique=True, index=True)
     hashed_password = Column(String)
     avatar_url = Column(String, nullable=True)
-    is_community = Column(Boolean, default=False)
+    
+    # Поля для работы с сообществами
+    is_community = Column(Boolean, default=False)           # Финальный статус сообщества
+    community_requested = Column(Boolean, default=False)    # Подал заявку
+    is_approved = Column(Boolean, default=True)             # Одобрено ли
 
 class Ride(Base):
     __tablename__ = "rides"

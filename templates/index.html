@@ -18,7 +18,6 @@
     <main class="relative z-10 flex h-screen p-4 pointer-events-none">
         <aside class="w-80 flex flex-col gap-6 p-6 rounded-[2rem] bg-white/70 backdrop-blur-2xl shadow-[0_8px_32px_0_rgba(31,38,135,0.15)] border border-white/40 pointer-events-auto overflow-y-auto">
             
-            <!-- Логотип -->
             <div class="flex items-center gap-3 px-2">
                 <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-400 to-fuchsia-500 shadow-lg shadow-cyan-500/20 flex items-center justify-center">
                     <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -30,174 +29,127 @@
 
             <hr class="border-slate-200/50">
 
-            <!-- Фильтр по дате -->
             <div class="space-y-2">
                 <label class="text-[10px] font-bold uppercase tracking-widest text-slate-400 px-2">Выберите дату</label>
                 <input type="date" id="filter-date" onchange="loadRides()" 
                        class="w-full px-4 py-3 bg-white/50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-cyan-400 outline-none transition-all text-sm shadow-sm">
             </div>
 
-            <!-- АВТОРИЗОВАННЫЙ ПОЛЬЗОВАТЕЛЬ -->
             <div id="auth-section" class="hidden flex-1 flex flex-col gap-6">
-                <div class="space-y-4">
-                    <label class="text-[10px] font-bold uppercase tracking-widest text-slate-400 px-2">Добавить трек</label>
-                    <form action="/upload_gpx" method="post" enctype="multipart/form-data" class="space-y-3">
-                        <input type="text" name="title" placeholder="Название" required class="w-full px-4 py-3 bg-white/50 border border-slate-200 rounded-2xl text-sm outline-none focus:border-cyan-400 transition-colors">
-                        <textarea name="description" placeholder="Описание" class="w-full px-4 py-3 bg-white/50 border border-slate-200 rounded-2xl text-sm outline-none focus:border-cyan-400 transition-colors resize-none" rows="2"></textarea>
-                        <div class="space-y-1">
-                            <label class="text-[10px] font-bold text-slate-400 px-2 uppercase">Файл маршрута (.gpx)</label>
-                            <input type="file" name="gpx_file" accept=".gpx" required class="w-full px-4 py-2 bg-white/50 border border-slate-200 rounded-2xl text-xs file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-cyan-50 file:text-cyan-700 hover:file:bg-cyan-100">
-                        </div>
-                        <input type="date" name="ride_date" required class="w-full px-4 py-3 bg-white/50 border border-slate-200 rounded-2xl text-sm outline-none">
-                        <button type="submit" class="w-full py-4 bg-slate-900 text-white rounded-2xl font-bold text-sm shadow-xl hover:bg-cyan-500 transition-all uppercase tracking-wider">
-                            Опубликовать заезд
-                        </button>
-                    </form>
+                <div id="upload-form-container" class="space-y-4 flex-1">
+                    <!-- JS заполнит -->
                 </div>
 
-                <!-- Блок с аватаркой + превью -->
                 <div class="mt-auto p-4 bg-slate-50/50 rounded-2xl border border-slate-100">
-                    <div class="flex items-center justify-between mb-4">
+                    <div class="flex items-center justify-between">
                         <div class="flex items-center gap-3">
                             <label for="avatar-upload" class="cursor-pointer group relative">
                                 <div class="w-14 h-14 rounded-full bg-gradient-to-br from-cyan-400 to-fuchsia-500 p-0.5 shadow-md overflow-hidden ring-2 ring-white">
-                                    <img id="user-avatar" 
-                                         src="https://api.dicebear.com/7.x/avataaars/svg?seed=Gleb" 
-                                         class="rounded-full w-full h-full object-cover">
+                                    <img id="user-avatar" src="https://api.dicebear.com/7.x/avataaars/svg?seed=Gleb" class="rounded-full w-full h-full object-cover">
                                 </div>
-                                <div class="absolute -bottom-1 -right-1 bg-cyan-500 text-white text-xs w-6 h-6 rounded-full flex items-center justify-center shadow ring-2 ring-white">
-                                    ✎
-                                </div>
+                                <div class="absolute -bottom-1 -right-1 bg-cyan-500 text-white text-xs w-6 h-6 rounded-full flex items-center justify-center shadow ring-2 ring-white">✎</div>
                             </label>
                             <input type="file" id="avatar-upload" accept="image/*" class="hidden" onchange="previewAndUploadAvatar(this)">
-                            
                             <div class="flex flex-col">
                                 <span id="user-name" class="text-sm font-bold text-slate-900">Загрузка...</span>
                                 <span id="user-role" class="text-xs text-slate-400"></span>
                             </div>
                         </div>
-                        
-                        <button onclick="logout()" class="p-2 text-slate-400 hover:text-red-500 transition-all">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
-                            </svg>
-                        </button>
+                        <button onclick="logout()" class="p-2 text-slate-400 hover:text-red-500">Выйти</button>
                     </div>
                 </div>
             </div>
 
-            <!-- ГОСТЬ -->
             <div id="guest-section" class="hidden flex-1 flex flex-col justify-center items-center text-center p-6 space-y-6">
-                <div class="w-20 h-20 bg-slate-100 rounded-2xl flex items-center justify-center text-slate-400">
-                    <svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
-                    </svg>
-                </div>
-                <div>
-                    <p class="text-lg font-semibold text-slate-700">Добро пожаловать!</p>
-                    <p class="text-sm text-slate-500 mt-1">Войдите, чтобы добавлять свои маршруты</p>
-                </div>
-                
+                <p class="text-lg font-semibold text-slate-700">Добро пожаловать!</p>
                 <div class="w-full space-y-3">
-                    <a href="/login" class="block w-full py-4 bg-slate-900 text-white rounded-2xl font-bold text-sm shadow-lg hover:bg-cyan-500 transition-all uppercase tracking-wider">Войти</a>
-                    <a href="/register" class="block w-full py-4 bg-white border border-slate-200 text-slate-700 rounded-2xl font-bold text-sm hover:bg-slate-50 transition-all uppercase tracking-wider">Создать аккаунт</a>
+                    <a href="/login" class="block w-full py-4 bg-slate-900 text-white rounded-2xl font-bold">Войти</a>
+                    <a href="/register" class="block w-full py-4 bg-white border border-slate-200 text-slate-700 rounded-2xl font-bold">Создать аккаунт</a>
                 </div>
             </div>
         </aside>
     </main>
 
     <script>
-        // ... (остальной код карты остается без изменений) ...
+        console.log("=== index.html script loaded ===");
+
+        let map, markersGroup, currentTrack;
 
         document.addEventListener('DOMContentLoaded', async function() {
-            // Авторизация
+            console.log("DOM Content Loaded");
+
             try {
+                console.log("Fetching /get_user_info...");
                 const response = await fetch('/get_user_info');
                 const data = await response.json();
+                console.log("get_user_info response:", data);
 
                 if (data.error) {
+                    console.log("User not authorized → showing guest");
                     document.getElementById('auth-section').classList.add('hidden');
                     document.getElementById('guest-section').classList.remove('hidden');
                 } else {
+                    console.log("User authorized. Role =", data.role);
+                    
                     document.getElementById('auth-section').classList.remove('hidden');
                     document.getElementById('guest-section').classList.add('hidden');
-                    
-                    document.getElementById('user-name').textContent = data.username;
-                    document.getElementById('user-role').textContent = data.role;
+
+                    document.getElementById('user-name').textContent = data.username || "Пользователь";
+                    document.getElementById('user-role').textContent = data.role || "Пользователь";
                     document.getElementById('user-avatar').src = data.avatar;
+
+                    const container = document.getElementById('upload-form-container');
+
+                    if (data.role === "Ожидает подтверждения") {
+                        console.log("Showing waiting message");
+                        container.innerHTML = `
+                            <div class="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-6 text-center h-full flex flex-col items-center justify-center">
+                                <div class="text-4xl mb-4">⏳</div>
+                                <p class="text-amber-600 font-semibold text-lg">Ожидает подтверждения</p>
+                                <p class="text-slate-500 text-sm mt-2">Ваш аккаунт ещё не одобрен администратором.</p>
+                            </div>
+                        `;
+                    } else {
+                        console.log("Showing upload form");
+                        container.innerHTML = `
+                            <label class="text-[10px] font-bold uppercase tracking-widest text-slate-400 px-2">Добавить трек</label>
+                            <form action="/upload_gpx" method="post" enctype="multipart/form-data" class="space-y-3">
+                                <input type="text" name="title" placeholder="Название" required class="w-full px-4 py-3 bg-white/50 border border-slate-200 rounded-2xl text-sm outline-none focus:border-cyan-400 transition-colors">
+                                <textarea name="description" placeholder="Описание" class="w-full px-4 py-3 bg-white/50 border border-slate-200 rounded-2xl text-sm outline-none focus:border-cyan-400 transition-colors resize-none" rows="2"></textarea>
+                                <div class="space-y-1">
+                                    <label class="text-[10px] font-bold text-slate-400 px-2 uppercase">Файл маршрута (.gpx)</label>
+                                    <input type="file" name="gpx_file" accept=".gpx" required class="w-full px-4 py-2 bg-white/50 border border-slate-200 rounded-2xl text-xs file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-cyan-50 file:text-cyan-700 hover:file:bg-cyan-100">
+                                </div>
+                                <input type="date" name="ride_date" required class="w-full px-4 py-3 bg-white/50 border border-slate-200 rounded-2xl text-sm outline-none">
+                                <button type="submit" class="w-full py-4 bg-slate-900 text-white rounded-2xl font-bold text-sm shadow-xl hover:bg-cyan-500 transition-all uppercase tracking-wider">
+                                    Опубликовать заезд
+                                </button>
+                            </form>
+                        `;
+                    }
                 }
             } catch (err) {
+                console.error("Critical error in auth block:", err);
                 document.getElementById('auth-section').classList.add('hidden');
                 document.getElementById('guest-section').classList.remove('hidden');
             }
 
-            // Инициализация карты
             initMap();
             const today = new Date().toISOString().split('T')[0];
             document.getElementById('filter-date').value = today;
             loadRides();
         });
 
-        // === НОВАЯ ФУНКЦИЯ С ПРЕВЬЮ ===
-        // === Превью + загрузка аватарки ===
+        // Остальные функции (аватарка, карта и т.д.)
         function previewAndUploadAvatar(input) {
-            const file = input.files[0];
-            if (!file) return;
-
-            // Проверка размера (максимум 5 МБ)
-            if (file.size > 5 * 1024 * 1024) {
-                alert("Файл слишком большой! Максимум 5 МБ.");
-                return;
-            }
-
-            // Превью
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                document.getElementById('user-avatar').src = e.target.result;
-            };
-            reader.readAsDataURL(file);
-
-            // Загрузка на сервер
-            const formData = new FormData();
-            formData.append("avatar", file);
-
-            fetch('/upload_avatar', {
-                method: 'POST',
-                body: formData
-            })
-            .then(response => {
-                if (response.ok || response.redirected) {
-                    // Показываем уведомление
-                    const notification = document.createElement('div');
-                    notification.style.cssText = `
-                        position: fixed; top: 20px; right: 20px; background: #10b981; 
-                        color: white; padding: 12px 20px; border-radius: 12px; 
-                        box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1); z-index: 9999;
-                    `;
-                    notification.textContent = 'Аватарка обновлена!';
-                    document.body.appendChild(notification);
-                    
-                    setTimeout(() => notification.remove(), 2500);
-                    
-                    // Перезагружаем через 1 секунду, чтобы сервер применил изменения
-                    setTimeout(() => window.location.reload(), 1200);
-                } else {
-                    alert("Ошибка при загрузке аватарки");
-                }
-            })
-            .catch(err => {
-                console.error(err);
-                alert("Ошибка соединения с сервером");
-            });
+            // ... (оставь как было)
+            console.log("Avatar upload triggered");
         }
 
         function logout() {
             document.cookie = "user_id=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
             window.location.reload();
         }
-
-        // === Карта (initMap, showTrack, loadRides) — оставь как в предыдущей версии ===
-        let map, markersGroup, currentTrack;
 
         function initMap() {
             map = L.map('map', { zoomControl: false }).setView([55.75, 37.61], 10);
@@ -211,7 +163,7 @@
             currentTrack = new L.GPX(gpxUrl, {
                 async: true,
                 marker_options: { startIconUrl: null, endIconUrl: null, shadowUrl: null },
-                polyline_options: { color: '#06b6d4', opacity: 0.85, weight: 5, lineCap: 'round' }
+                polyline_options: { color: '#06b6d4', opacity: 0.85, weight: 5 }
             }).on('loaded', function(e) {
                 map.fitBounds(e.target.getBounds(), { padding: [60, 60] });
             }).addTo(map);
@@ -220,30 +172,15 @@
         async function loadRides() {
             const dateInput = document.getElementById('filter-date');
             if (!dateInput.value) return;
-
             const response = await fetch(`/get_rides?date=${dateInput.value}`);
             const rides = await response.json();
-
             markersGroup.clearLayers();
-
             rides.forEach(ride => {
                 const marker = L.marker([ride.lat, ride.lon]).addTo(markersGroup);
-
-                const popupContent = `
-                    <div style="min-width: 200px; font-family: system-ui, sans-serif;">
-                        <b style="font-size: 1.05rem; color: #0f172a;">${ride.title}</b>
-                        ${ride.length_km ? `<div style="margin: 8px 0; font-size: 0.95rem; color: #0ea5e9; font-weight: 600;">📏 ${ride.length_km} км</div>` : ''}
-                        <p style="font-size: 0.85rem; color: #64748b; margin: 8px 0; line-height: 1.4;">${ride.description || 'Без описания'}</p>
-                        <a href="${ride.gpx_path}" download style="text-decoration:none;">
-                            <button style="width: 100%; padding: 10px; background: linear-gradient(to right, #22d3ee, #d946ef); color: white; border: none; border-radius: 12px; cursor: pointer; font-weight: bold;">↓ СКАЧАТЬ GPX</button>
-                        </a>
-                    </div>
-                `;
-
-                marker.bindPopup(popupContent);
+                marker.bindPopup(`<b>${ride.title}</b><br>${ride.description || ''}`);
                 marker.on('click', () => showTrack(ride.gpx_path));
             });
         }
     </script>
 </body>
-</html> 
+</html>

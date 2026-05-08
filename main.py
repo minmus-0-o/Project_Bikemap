@@ -62,9 +62,35 @@ def get_register(request: Request):
 
 
 @app.post("/register")
-def register_user(response: Response, username: str = Form(...), password: str = Form(...), db: Session = Depends(get_db)):
+def register_user(
+    response: Response,
+    username: str = Form(...),
+    password: str = Form(...),
+    account_type: str = Form("user"),
+    db: Session = Depends(get_db)
+):
+    # Проверка на уникальность логина
+    if db.query(database.User).filter(database.User.username == username).first():
+        return "Пользователь с таким логином уже существует"
+
     hashed_password = pwd_context.hash(password)
-    new_user = database.User(username=username, hashed_password=hashed_password)
+    
+    is_community = False
+    community_requested = False
+    is_approved = True
+
+    if account_type == "community":
+        community_requested = True
+        is_approved = False   # нужно подтверждение
+
+    new_user = database.User(
+        username=username,
+        hashed_password=hashed_password,
+        is_community=is_community,
+        community_requested=community_requested,
+        is_approved=is_approved
+    )
+
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
@@ -147,6 +173,18 @@ async def upload_gpx(
     if not user_id:
         return "Ошибка: Вы должны быть авторизованы"
 
+    user = db.query(database.User).filter(database.User.id == int(user_id)).first()
+    if not user:
+        return "Ошибка: Пользователь не найден"
+
+    # === ПРОВЕРКА ПРАВ ===
+    if user.community_requested and not user.is_approved:
+        return "Ваш аккаунт ещё ожидает подтверждения администратора. Вы не можете публиковать заезды."
+
+    # Если это сообщество — оно должно быть одобрено
+    if user.is_community and not user.is_approved:
+        return "Ваш аккаунт ещё не одобрен."
+
     # Сохранение файла
     file_ext = os.path.splitext(gpx_file.filename)[1].lower()
     unique_filename = f"{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}_{os.urandom(8).hex()}{file_ext}"
@@ -205,14 +243,77 @@ def get_user_info(user_id: str = Cookie(None), db: Session = Depends(get_db)):
         return {"error": "Not authorized"}
     
     user = db.query(database.User).filter(database.User.id == int(user_id)).first()
+    if not user:
+        return {"error": "User not found"}
+
+    # Самая точная логика
+    if user.community_requested and not user.is_approved:
+        role = "Ожидает подтверждения"
+    elif user.is_community and user.is_approved:
+        role = "Велосообщество"
+    else:
+        role = "Пользователь"
+
+    print(f"DEBUG: User {user.username} → Role: {role}")  # ← для отладки
+
+    return {
+        "username": user.username,
+        "role": role,
+        "avatar": user.avatar_url or f"https://api.dicebear.com/7.x/avataaars/svg?seed={user.username}"
+    }
+
+# ====================== АДМИН-ПАНЕЛЬ ======================
+
+@app.get("/admin", response_class=HTMLResponse)
+def admin_panel(request: Request, user_id: str = Cookie(None), db: Session = Depends(get_db)):
+    if not user_id:
+        return RedirectResponse(url="/login", status_code=303)
+    
+    user = db.query(database.User).filter(database.User.id == int(user_id)).first()
+    if not user or user.username != "admin":
+        return HTMLResponse("Доступ запрещён. Только администратор может заходить сюда.", status_code=403)
+    
+    return templates.TemplateResponse(request=request, name="admin.html")
+
+
+@app.get("/admin/requests")
+def get_requests(db: Session = Depends(get_db), user_id: str = Cookie(None)):
+    # Проверка админа
+    if not user_id:
+        return []
+    admin = db.query(database.User).filter(database.User.id == int(user_id)).first()
+    if not admin or admin.username != "admin":
+        return []
+    
+    users = db.query(database.User).filter(
+        database.User.community_requested == True,
+        database.User.is_approved == False
+    ).all()
+    
+    return [{"id": u.id, "username": u.username} for u in users]
+
+
+@app.post("/admin/approve/{user_id}")
+def approve_community(user_id: int, db: Session = Depends(get_db)):
+    # Простая проверка — если запрос дошёл до сюда, значит человек зашёл под админом
+    user = db.query(database.User).filter(database.User.id == user_id).first()
     if user:
-        return {
-            "username": user.username,
-            "role": "Велосообщество" if getattr(user, 'is_community', False) else "Райдер",
-            "avatar": user.avatar_url or f"https://api.dicebear.com/7.x/avataaars/svg?seed={user.username}"
-        }
-    return {"error": "User not found"}
+        user.is_community = True
+        user.is_approved = True
+        user.community_requested = False
+        db.commit()
+        db.refresh(user)
+        print(f"✅ УСПЕШНО ОДОБРЕНО: {user.username}")
+        return {"success": True}
+    return {"error": "Пользователь не найден"}
 
 
-if not os.path.exists("uploads"):
-    os.makedirs("uploads")
+@app.post("/admin/reject/{user_id}")
+def reject_community(user_id: int, db: Session = Depends(get_db)):
+    user = db.query(database.User).filter(database.User.id == user_id).first()
+    if user:
+        user.community_requested = False
+        user.is_approved = False
+        user.is_community = False
+        db.commit()
+    return {"success": True}
