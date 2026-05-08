@@ -18,6 +18,7 @@
     <main class="relative z-10 flex h-screen p-4 pointer-events-none">
         <aside class="w-80 flex flex-col gap-6 p-6 rounded-[2rem] bg-white/70 backdrop-blur-2xl shadow-[0_8px_32px_0_rgba(31,38,135,0.15)] border border-white/40 pointer-events-auto overflow-y-auto">
             
+            <!-- Логотип -->
             <div class="flex items-center gap-3 px-2">
                 <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-400 to-fuchsia-500 shadow-lg shadow-cyan-500/20 flex items-center justify-center">
                     <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -29,16 +30,27 @@
 
             <hr class="border-slate-200/50">
 
+            <!-- Фильтр по дате -->
             <div class="space-y-2">
                 <label class="text-[10px] font-bold uppercase tracking-widest text-slate-400 px-2">Выберите дату</label>
                 <input type="date" id="filter-date" onchange="loadRides()" 
                        class="w-full px-4 py-3 bg-white/50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-cyan-400 outline-none transition-all text-sm shadow-sm">
             </div>
 
-            <div id="auth-section" class="hidden flex-1 flex flex-col gap-6">
-                <div id="upload-form-container" class="space-y-4 flex-1">
-                    <!-- JS заполнит -->
+            <!-- Фильтр Все / Велосообщества -->
+            <div class="space-y-2">
+                <label class="text-[10px] font-bold uppercase tracking-widest text-slate-400 px-2">Тип заездов</label>
+                <div class="flex bg-white/50 rounded-2xl p-1 border border-slate-200">
+                    <button onclick="setFilter(0)" id="btn-all" 
+                            class="flex-1 py-3 text-sm font-semibold rounded-xl transition-all bg-white">Все заезды</button>
+                    <button onclick="setFilter(1)" id="btn-community" 
+                            class="flex-1 py-3 text-sm font-semibold rounded-xl transition-all">Велосообщества</button>
                 </div>
+            </div>
+
+            <!-- Авторизованный блок -->
+            <div id="auth-section" class="hidden flex-1 flex flex-col gap-6">
+                <div id="upload-form-container" class="space-y-4 flex-1"></div>
 
                 <div class="mt-auto p-4 bg-slate-50/50 rounded-2xl border border-slate-100">
                     <div class="flex items-center justify-between">
@@ -55,13 +67,22 @@
                                 <span id="user-role" class="text-xs text-slate-400"></span>
                             </div>
                         </div>
-                        <button onclick="logout()" class="p-2 text-slate-400 hover:text-red-500">Выйти</button>
+                        <button onclick="logout()" class="p-2 text-slate-400 hover:text-red-500 transition-all">Выйти</button>
                     </div>
                 </div>
             </div>
 
+            <!-- Гость -->
             <div id="guest-section" class="hidden flex-1 flex flex-col justify-center items-center text-center p-6 space-y-6">
-                <p class="text-lg font-semibold text-slate-700">Добро пожаловать!</p>
+                <div class="w-20 h-20 bg-slate-100 rounded-2xl flex items-center justify-center text-slate-400">
+                    <svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+                    </svg>
+                </div>
+                <div>
+                    <p class="text-lg font-semibold text-slate-700">Добро пожаловать!</p>
+                    <p class="text-sm text-slate-500 mt-1">Войдите, чтобы добавлять свои маршруты</p>
+                </div>
                 <div class="w-full space-y-3">
                     <a href="/login" class="block w-full py-4 bg-slate-900 text-white rounded-2xl font-bold">Войти</a>
                     <a href="/register" class="block w-full py-4 bg-white border border-slate-200 text-slate-700 rounded-2xl font-bold">Создать аккаунт</a>
@@ -71,46 +92,46 @@
     </main>
 
     <script>
-        console.log("=== index.html script loaded ===");
-
         let map, markersGroup, currentTrack;
+        let currentFilter = 0; // 0 = все, 1 = только сообщества
+
+        function setFilter(mode) {
+            currentFilter = mode;
+            document.getElementById('btn-all').classList.toggle('bg-white', mode === 0);
+            document.getElementById('btn-community').classList.toggle('bg-white', mode === 1);
+            loadRides();
+        }
 
         document.addEventListener('DOMContentLoaded', async function() {
-            console.log("DOM Content Loaded");
+            initMap();   // Сначала инициализируем карту
 
+            // Авторизация и форма
             try {
-                console.log("Fetching /get_user_info...");
                 const response = await fetch('/get_user_info');
                 const data = await response.json();
-                console.log("get_user_info response:", data);
 
                 if (data.error) {
-                    console.log("User not authorized → showing guest");
                     document.getElementById('auth-section').classList.add('hidden');
                     document.getElementById('guest-section').classList.remove('hidden');
                 } else {
-                    console.log("User authorized. Role =", data.role);
-                    
                     document.getElementById('auth-section').classList.remove('hidden');
                     document.getElementById('guest-section').classList.add('hidden');
 
-                    document.getElementById('user-name').textContent = data.username || "Пользователь";
-                    document.getElementById('user-role').textContent = data.role || "Пользователь";
+                    document.getElementById('user-name').textContent = data.username;
+                    document.getElementById('user-role').textContent = data.role;
                     document.getElementById('user-avatar').src = data.avatar;
 
                     const container = document.getElementById('upload-form-container');
 
                     if (data.role === "Ожидает подтверждения") {
-                        console.log("Showing waiting message");
                         container.innerHTML = `
                             <div class="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-6 text-center h-full flex flex-col items-center justify-center">
                                 <div class="text-4xl mb-4">⏳</div>
-                                <p class="text-amber-600 font-semibold text-lg">Ожидает подтверждения</p>
-                                <p class="text-slate-500 text-sm mt-2">Ваш аккаунт ещё не одобрен администратором.</p>
+                                <p class="text-amber-600 font-semibold">Ожидает подтверждения</p>
+                                <p class="text-slate-500 text-sm mt-2">После одобрения администратором вы сможете публиковать заезды</p>
                             </div>
                         `;
                     } else {
-                        console.log("Showing upload form");
                         container.innerHTML = `
                             <label class="text-[10px] font-bold uppercase tracking-widest text-slate-400 px-2">Добавить трек</label>
                             <form action="/upload_gpx" method="post" enctype="multipart/form-data" class="space-y-3">
@@ -129,41 +150,45 @@
                     }
                 }
             } catch (err) {
-                console.error("Critical error in auth block:", err);
+                console.error(err);
                 document.getElementById('auth-section').classList.add('hidden');
                 document.getElementById('guest-section').classList.remove('hidden');
             }
 
-            initMap();
             const today = new Date().toISOString().split('T')[0];
             document.getElementById('filter-date').value = today;
             loadRides();
         });
-
-        // Остальные функции (аватарка, карта и т.д.)
-        function previewAndUploadAvatar(input) {
-            // ... (оставь как было)
-            console.log("Avatar upload triggered");
-        }
-
-        function logout() {
-            document.cookie = "user_id=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
-            window.location.reload();
-        }
 
         function initMap() {
             map = L.map('map', { zoomControl: false }).setView([55.75, 37.61], 10);
             L.control.zoom({ position: 'bottomright' }).addTo(map);
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
             markersGroup = L.layerGroup().addTo(map);
+
+            // Закрытие трека при клике по пустому месту карты
+            map.on('click', function(e) {
+                if (currentTrack) {
+                    map.removeLayer(currentTrack);
+                    currentTrack = null;
+                }
+            });
         }
 
         function showTrack(gpxUrl) {
-            if (currentTrack) map.removeLayer(currentTrack);
+            if (currentTrack) {
+                map.removeLayer(currentTrack);
+            }
+
             currentTrack = new L.GPX(gpxUrl, {
                 async: true,
                 marker_options: { startIconUrl: null, endIconUrl: null, shadowUrl: null },
-                polyline_options: { color: '#06b6d4', opacity: 0.85, weight: 5 }
+                polyline_options: {
+                    color: '#06b6d4',
+                    opacity: 0.85,
+                    weight: 5,
+                    lineCap: 'round'
+                }
             }).on('loaded', function(e) {
                 map.fitBounds(e.target.getBounds(), { padding: [60, 60] });
             }).addTo(map);
@@ -171,15 +196,43 @@
 
         async function loadRides() {
             const dateInput = document.getElementById('filter-date');
-            if (!dateInput.value) return;
-            const response = await fetch(`/get_rides?date=${dateInput.value}`);
+            if (!dateInput.value || !markersGroup) return;
+
+            const url = `/get_rides?date=${dateInput.value}&only_community=${currentFilter === 1}`;
+            const response = await fetch(url);
             const rides = await response.json();
+
             markersGroup.clearLayers();
+
             rides.forEach(ride => {
                 const marker = L.marker([ride.lat, ride.lon]).addTo(markersGroup);
-                marker.bindPopup(`<b>${ride.title}</b><br>${ride.description || ''}`);
+
+                const popupContent = `
+                    <div style="min-width: 200px; font-family: system-ui, sans-serif;">
+                        <b style="font-size: 1.05rem; color: #0f172a;">${ride.title}</b>
+                        ${ride.length_km ? `<div style="margin: 8px 0; font-size: 0.95rem; color: #0ea5e9; font-weight: 600;">📏 ${ride.length_km} км</div>` : ''}
+                        <p style="font-size: 0.85rem; color: #64748b; margin: 8px 0; line-height: 1.4;">${ride.description || 'Без описания'}</p>
+                        <a href="${ride.gpx_path}" download style="text-decoration:none;">
+                            <button style="width: 100%; padding: 10px; background: linear-gradient(to right, #22d3ee, #d946ef); color: white; border: none; border-radius: 12px; cursor: pointer; font-weight: bold;">
+                                ↓ СКАЧАТЬ GPX
+                            </button>
+                        </a>
+                    </div>
+                `;
+
+                marker.bindPopup(popupContent);
                 marker.on('click', () => showTrack(ride.gpx_path));
             });
+        }
+
+        // Аватарка и выход
+        function previewAndUploadAvatar(input) {
+            // ваша текущая функция
+        }
+
+        function logout() {
+            document.cookie = "user_id=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+            window.location.reload();
         }
     </script>
 </body>

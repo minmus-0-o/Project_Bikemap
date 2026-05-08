@@ -218,13 +218,23 @@ async def upload_gpx(
 
 
 @app.get("/get_rides")
-def get_rides(date: str, db: Session = Depends(get_db)):
+def get_rides(date: str, only_community: bool = False, db: Session = Depends(get_db)):
     target_date = datetime.strptime(date, "%Y-%m-%d").date()
-    rides = db.query(database.Ride).filter(database.Ride.ride_date == target_date).all()
+    
+    query = db.query(database.Ride).filter(database.Ride.ride_date == target_date)
+    
+    if only_community:
+        query = query.join(database.User).filter(
+            database.User.is_community == True,
+            database.User.is_approved == True
+        )
+    
+    rides = query.all()
 
     result = []
     for r in rides:
-        length_km = round(r.length / 1000, 2) if r.length else None
+        length_km = round(r.length / 1000, 2) if getattr(r, 'length', None) else None
+        
         result.append({
             "id": r.id,
             "title": r.title,
@@ -233,6 +243,7 @@ def get_rides(date: str, db: Session = Depends(get_db)):
             "lon": r.start_lon,
             "gpx_path": r.gpx_file,
             "length_km": length_km
+            # is_community убрали, чтобы не было ошибки
         })
     return result
 
