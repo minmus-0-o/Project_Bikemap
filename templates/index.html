@@ -93,7 +93,7 @@
 
     <script>
         let map, markersGroup, currentTrack;
-        let currentFilter = 0; // 0 = все, 1 = только сообщества
+        let currentFilter = 0;
 
         function setFilter(mode) {
             currentFilter = mode;
@@ -103,9 +103,8 @@
         }
 
         document.addEventListener('DOMContentLoaded', async function() {
-            initMap();   // Сначала инициализируем карту
+            initMap();
 
-            // Авторизация и форма
             try {
                 const response = await fetch('/get_user_info');
                 const data = await response.json();
@@ -128,7 +127,7 @@
                             <div class="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-6 text-center h-full flex flex-col items-center justify-center">
                                 <div class="text-4xl mb-4">⏳</div>
                                 <p class="text-amber-600 font-semibold">Ожидает подтверждения</p>
-                                <p class="text-slate-500 text-sm mt-2">После одобрения администратором вы сможете публиковать заезды</p>
+                                <p class="text-slate-500 text-sm mt-2">После одобрения вы сможете публиковать заезды</p>
                             </div>
                         `;
                     } else {
@@ -151,8 +150,6 @@
                 }
             } catch (err) {
                 console.error(err);
-                document.getElementById('auth-section').classList.add('hidden');
-                document.getElementById('guest-section').classList.remove('hidden');
             }
 
             const today = new Date().toISOString().split('T')[0];
@@ -166,8 +163,7 @@
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
             markersGroup = L.layerGroup().addTo(map);
 
-            // Закрытие трека при клике по пустому месту карты
-            map.on('click', function(e) {
+            map.on('click', () => {
                 if (currentTrack) {
                     map.removeLayer(currentTrack);
                     currentTrack = null;
@@ -175,22 +171,23 @@
             });
         }
 
-        function showTrack(gpxUrl) {
-            if (currentTrack) {
-                map.removeLayer(currentTrack);
-            }
+        function showTrack(gpxUrl, marker) {
+            if (currentTrack) map.removeLayer(currentTrack);
 
             currentTrack = new L.GPX(gpxUrl, {
                 async: true,
                 marker_options: { startIconUrl: null, endIconUrl: null, shadowUrl: null },
-                polyline_options: {
-                    color: '#06b6d4',
-                    opacity: 0.85,
-                    weight: 5,
-                    lineCap: 'round'
-                }
+                polyline_options: { color: '#06b6d4', opacity: 0.85, weight: 5, lineCap: 'round' }
             }).on('loaded', function(e) {
-                map.fitBounds(e.target.getBounds(), { padding: [60, 60] });
+                map.flyToBounds(e.target.getBounds(), {
+                    padding: [100, 130],
+                    maxZoom: 15,
+                    duration: 1.2
+                });
+
+                setTimeout(() => {
+                    marker.openPopup();
+                }, 1100);
             }).addTo(map);
         }
 
@@ -208,26 +205,79 @@
                 const marker = L.marker([ride.lat, ride.lon]).addTo(markersGroup);
 
                 const popupContent = `
-                    <div style="min-width: 200px; font-family: system-ui, sans-serif;">
+                    <div style="min-width: 210px; max-width: 260px; font-family: system-ui, sans-serif;">
+                        <div class="flex items-center gap-2.5 mb-2">
+                            <img src="${ride.author_avatar}" class="w-7 h-7 rounded-full object-cover border border-white shadow">
+                            <div class="text-sm font-medium">${ride.author_username}</div>
+                        </div>
                         <b style="font-size: 1.05rem; color: #0f172a;">${ride.title}</b>
-                        ${ride.length_km ? `<div style="margin: 8px 0; font-size: 0.95rem; color: #0ea5e9; font-weight: 600;">📏 ${ride.length_km} км</div>` : ''}
-                        <p style="font-size: 0.85rem; color: #64748b; margin: 8px 0; line-height: 1.4;">${ride.description || 'Без описания'}</p>
+                        
+                        ${ride.length_km ? `<div style="margin:6px 0; color:#0ea5e9; font-weight:600;">📏 ${ride.length_km} км</div>` : ''}
+                        
+                        <p style="font-size:0.83rem; color:#64748b; line-height:1.35; margin:6px 0;">
+                            ${ride.description ? ride.description.substring(0, 110) + (ride.description.length > 110 ? '...' : '') : 'Без описания'}
+                        </p>
+                        
                         <a href="${ride.gpx_path}" download style="text-decoration:none;">
-                            <button style="width: 100%; padding: 10px; background: linear-gradient(to right, #22d3ee, #d946ef); color: white; border: none; border-radius: 12px; cursor: pointer; font-weight: bold;">
+                            <button style="width:100%; padding:9px; background:linear-gradient(to right,#22d3ee,#d946ef); color:white; border:none; border-radius:10px; cursor:pointer; font-weight:bold;">
                                 ↓ СКАЧАТЬ GPX
                             </button>
                         </a>
                     </div>
                 `;
 
-                marker.bindPopup(popupContent);
-                marker.on('click', () => showTrack(ride.gpx_path));
+                const popup = L.popup({
+                    closeButton: true,
+                    autoPan: false,
+                    keepInView: true,
+                    offset: [0, -8]
+                }).setContent(popupContent);
+
+                marker.bindPopup(popup);
+
+                marker.on('click', function() {
+                    showTrack(ride.gpx_path, marker);
+                });
             });
         }
 
-        // Аватарка и выход
         function previewAndUploadAvatar(input) {
-            // ваша текущая функция
+            const file = input.files[0];
+            if (!file) return;
+
+            if (file.size > 5 * 1024 * 1024) {
+                alert("Файл слишком большой! Максимум 5 МБ.");
+                return;
+            }
+
+            // Превью
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                document.getElementById('user-avatar').src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+
+            // Отправка на сервер
+            const formData = new FormData();
+            formData.append("avatar", file);
+
+            fetch('/upload_avatar', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => {
+                console.log("Upload response status:", response.status);
+                if (response.ok || response.redirected) {
+                    console.log("✅ Аватарка успешно загружена");
+                    setTimeout(() => window.location.reload(), 800);
+                } else {
+                    alert("Ошибка при загрузке аватарки");
+                }
+            })
+            .catch(err => {
+                console.error("Upload error:", err);
+                alert("Ошибка соединения с сервером");
+            });
         }
 
         function logout() {

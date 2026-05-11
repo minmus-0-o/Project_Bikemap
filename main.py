@@ -9,6 +9,7 @@ import os
 from datetime import datetime
 
 import database
+import gpxpy
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
@@ -21,10 +22,8 @@ database.Base.metadata.create_all(bind=database.engine)
 
 templates = Jinja2Templates(directory="templates")
 
-# ====================== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ======================
+
 def get_gpx_info(file_path):
-    """Возвращает стартовую точку и длину трека"""
-    import gpxpy
     with open(file_path, 'r', encoding='utf-8') as gpx_file:
         gpx = gpxpy.parse(gpx_file)
         
@@ -50,9 +49,9 @@ def get_db():
         db.close()
 
 
-# ====================== МАРШРУТЫ ======================
+# ====================== ОСНОВНЫЕ РОУТЫ ======================
 @app.get("/", response_class=HTMLResponse)
-def read_root(request: Request, user_id: str = Cookie(None), db: Session = Depends(get_db)):
+def read_root(request: Request):
     return templates.TemplateResponse(request=request, name="index.html")
 
 
@@ -69,7 +68,6 @@ def register_user(
     account_type: str = Form("user"),
     db: Session = Depends(get_db)
 ):
-    # Проверка на уникальность логина
     if db.query(database.User).filter(database.User.username == username).first():
         return "Пользователь с таким логином уже существует"
 
@@ -81,7 +79,7 @@ def register_user(
 
     if account_type == "community":
         community_requested = True
-        is_approved = False   # нужно подтверждение
+        is_approved = False
 
     new_user = database.User(
         username=username,
@@ -116,6 +114,7 @@ def login_user(username: str = Form(...), password: str = Form(...), db: Session
     return response
 
 
+# ====================== АВАТАРКИ ======================
 @app.post("/upload_avatar")
 async def upload_avatar(
     avatar: UploadFile = File(...),
@@ -129,25 +128,22 @@ async def upload_avatar(
     if not user:
         return RedirectResponse(url="/", status_code=303)
 
-    # Проверка типа файла
     allowed_types = ["image/jpeg", "image/png", "image/webp", "image/gif"]
     if avatar.content_type not in allowed_types:
-        return "Ошибка: Разрешены только изображения (jpg, png, webp, gif)"
+        return "Ошибка: Разрешены только изображения"
 
     avatar_dir = "static/avatars"
     os.makedirs(avatar_dir, exist_ok=True)
 
-    # Удаление старой аватарки
+    # Удаляем старую аватарку
     if user.avatar_url and user.avatar_url.startswith("/static/avatars/"):
-        old_file_path = "." + user.avatar_url  # добавляем точку в начало
-        if os.path.exists(old_file_path):
+        old_path = "." + user.avatar_url
+        if os.path.exists(old_path):
             try:
-                os.remove(old_file_path)
-                print(f"Старая аватарка удалена: {old_file_path}")
-            except Exception as e:
-                print(f"Не удалось удалить старую аватарку: {e}")
+                os.remove(old_path)
+            except:
+                pass
 
-    # Сохранение новой
     file_ext = os.path.splitext(avatar.filename)[1].lower()
     unique_name = f"user_{user_id}_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}{file_ext}"
     file_path = f"{avatar_dir}/{unique_name}"
@@ -157,10 +153,12 @@ async def upload_avatar(
 
     user.avatar_url = f"/static/avatars/{unique_name}"
     db.commit()
-
+    print(f"✅ Аватарка обновлена для пользователя {user.username}: {user.avatar_url}")
+    
     return RedirectResponse(url="/", status_code=303)
 
 
+# ====================== ЗАГРУЗКА МАРШРУТОВ ======================
 @app.post("/upload_gpx")
 async def upload_gpx(
     title: str = Form(...),
@@ -177,15 +175,9 @@ async def upload_gpx(
     if not user:
         return "Ошибка: Пользователь не найден"
 
-    # === ПРОВЕРКА ПРАВ ===
     if user.community_requested and not user.is_approved:
-        return "Ваш аккаунт ещё ожидает подтверждения администратора. Вы не можете публиковать заезды."
+        return "Ваш аккаунт ещё ожидает подтверждения администратора"
 
-    # Если это сообщество — оно должно быть одобрено
-    if user.is_community and not user.is_approved:
-        return "Ваш аккаунт ещё не одобрен."
-
-    # Сохранение файла
     file_ext = os.path.splitext(gpx_file.filename)[1].lower()
     unique_filename = f"{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}_{os.urandom(8).hex()}{file_ext}"
     file_path = f"uploads/{unique_filename}"
@@ -194,7 +186,6 @@ async def upload_gpx(
         shutil.copyfileobj(gpx_file.file, buffer)
     
     lat, lon, length = get_gpx_info(file_path)
-    
     if lat is None:
         return "Ошибка: Не удалось обработать GPX файл"
 
@@ -234,7 +225,11 @@ def get_rides(date: str, only_community: bool = False, db: Session = Depends(get
     result = []
     for r in rides:
         length_km = round(r.length / 1000, 2) if getattr(r, 'length', None) else None
+        author = db.query(database.User).filter(database.User.id == r.user_id).first()
         
+        author_avatar = author.avatar_url if author and author.avatar_url else \
+                        f"https://api.dicebear.com/7.x/initials/svg?seed={author.username if author else 'user'}&backgroundColor=0f172a&color=ffffff&fontSize=40"
+
         result.append({
             "id": r.id,
             "title": r.title,
@@ -242,8 +237,9 @@ def get_rides(date: str, only_community: bool = False, db: Session = Depends(get
             "lat": r.start_lat,
             "lon": r.start_lon,
             "gpx_path": r.gpx_file,
-            "length_km": length_km
-            # is_community убрали, чтобы не было ошибки
+            "length_km": length_km,
+            "author_username": author.username if author else "Неизвестно",
+            "author_avatar": author_avatar
         })
     return result
 
@@ -257,7 +253,6 @@ def get_user_info(user_id: str = Cookie(None), db: Session = Depends(get_db)):
     if not user:
         return {"error": "User not found"}
 
-    # Самая точная логика
     if user.community_requested and not user.is_approved:
         role = "Ожидает подтверждения"
     elif user.is_community and user.is_approved:
@@ -265,16 +260,17 @@ def get_user_info(user_id: str = Cookie(None), db: Session = Depends(get_db)):
     else:
         role = "Пользователь"
 
-    print(f"DEBUG: User {user.username} → Role: {role}")  # ← для отладки
+    avatar = user.avatar_url if user.avatar_url else \
+             f"https://api.dicebear.com/7.x/initials/svg?seed={user.username}&backgroundColor=0f172a&color=ffffff&fontSize=40"
 
     return {
         "username": user.username,
         "role": role,
-        "avatar": user.avatar_url or f"https://api.dicebear.com/7.x/avataaars/svg?seed={user.username}"
+        "avatar": avatar
     }
 
-# ====================== АДМИН-ПАНЕЛЬ ======================
 
+# ====================== АДМИН-ПАНЕЛЬ ======================
 @app.get("/admin", response_class=HTMLResponse)
 def admin_panel(request: Request, user_id: str = Cookie(None), db: Session = Depends(get_db)):
     if not user_id:
@@ -289,7 +285,6 @@ def admin_panel(request: Request, user_id: str = Cookie(None), db: Session = Dep
 
 @app.get("/admin/requests")
 def get_requests(db: Session = Depends(get_db), user_id: str = Cookie(None)):
-    # Проверка админа
     if not user_id:
         return []
     admin = db.query(database.User).filter(database.User.id == int(user_id)).first()
@@ -306,7 +301,7 @@ def get_requests(db: Session = Depends(get_db), user_id: str = Cookie(None)):
 
 @app.post("/admin/approve/{user_id}")
 def approve_community(user_id: int, db: Session = Depends(get_db)):
-    # Простая проверка — если запрос дошёл до сюда, значит человек зашёл под админом
+    """Простая версия без строгой проверки cookie"""
     user = db.query(database.User).filter(database.User.id == user_id).first()
     if user:
         user.is_community = True
@@ -328,3 +323,9 @@ def reject_community(user_id: int, db: Session = Depends(get_db)):
         user.is_community = False
         db.commit()
     return {"success": True}
+
+
+if not os.path.exists("uploads"):
+    os.makedirs("uploads")
+if not os.path.exists("static/avatars"):
+    os.makedirs("static/avatars")
