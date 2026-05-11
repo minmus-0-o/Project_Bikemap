@@ -239,7 +239,8 @@ def get_rides(date: str, only_community: bool = False, db: Session = Depends(get
             "gpx_path": r.gpx_file,
             "length_km": length_km,
             "author_username": author.username if author else "Неизвестно",
-            "author_avatar": author_avatar
+            "author_avatar": author_avatar,
+            "user_id": r.user_id          # ← обязательно должно быть
         })
     return result
 
@@ -265,6 +266,7 @@ def get_user_info(user_id: str = Cookie(None), db: Session = Depends(get_db)):
 
     return {
         "username": user.username,
+        "user_id": user.id,
         "role": role,
         "avatar": avatar
     }
@@ -322,6 +324,39 @@ def reject_community(user_id: int, db: Session = Depends(get_db)):
         user.is_approved = False
         user.is_community = False
         db.commit()
+    return {"success": True}
+
+# ====================== УДАЛЕНИЕ МАРШРУТА ======================
+@app.post("/delete_ride/{ride_id}")
+def delete_ride(ride_id: int, user_id: str = Cookie(None), db: Session = Depends(get_db)):
+    if not user_id:
+        return {"error": "Не авторизован"}
+    
+    user = db.query(database.User).filter(database.User.id == int(user_id)).first()
+    if not user:
+        return {"error": "Пользователь не найден"}
+    
+    ride = db.query(database.Ride).filter(database.Ride.id == ride_id).first()
+    if not ride:
+        return {"error": "Маршрут не найден"}
+    
+    # Проверка прав: автор или админ
+    is_admin = (user.username == "admin")
+    is_owner = (ride.user_id == int(user_id))
+    
+    if not (is_admin or is_owner):
+        return {"error": "Нет прав на удаление этого маршрута"}
+    
+    # Удаляем файл GPX
+    if os.path.exists(ride.gpx_file):
+        try:
+            os.remove(ride.gpx_file)
+        except:
+            pass
+    
+    db.delete(ride)
+    db.commit()
+    
     return {"success": True}
 
 

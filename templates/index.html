@@ -25,7 +25,7 @@
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"></path>
                     </svg>
                 </div>
-                <span class="text-2xl font-black italic tracking-tighter uppercase text-slate-900">VELOCITY<span class="text-cyan-500">.</span></span>
+                <span class="text-2xl font-black italic tracking-tighter uppercase text-slate-900">BIKEMAP<span class="text-cyan-500"></span></span>
             </div>
 
             <hr class="border-slate-200/50">
@@ -59,7 +59,7 @@
                         <label for="avatar-upload" class="cursor-pointer group relative flex-shrink-0">
                             <div class="w-14 h-14 rounded-full bg-gradient-to-br from-cyan-400 to-fuchsia-500 p-0.5 shadow-md overflow-hidden ring-2 ring-white">
                                 <img id="user-avatar" src="https://api.dicebear.com/7.x/avataaars/svg?seed=Gleb" 
-                                    class="rounded-full w-full h-full object-cover">
+                                     class="rounded-full w-full h-full object-cover">
                             </div>
                             <div class="absolute -bottom-1 -right-1 bg-cyan-500 text-white text-xs w-6 h-6 rounded-full flex items-center justify-center shadow ring-2 ring-white">✎</div>
                         </label>
@@ -75,9 +75,9 @@
                             <span id="user-role" class="text-xs text-slate-400 block truncate"></span>
                         </div>
 
-                        <!-- Кнопка выхода — простой текст -->
+                        <!-- Кнопка выхода -->
                         <button onclick="logout()" 
-                                class="flex-shrink-0 px-3 py-2 text-sm font-medium text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-2xl transition-all active:scale-95"
+                                class="flex-shrink-0 px-4 py-2 text-sm font-medium text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-2xl transition-all active:scale-95"
                                 title="Выйти из аккаунта">
                             Выйти
                         </button>
@@ -218,40 +218,115 @@
                 const marker = L.marker([ride.lat, ride.lon]).addTo(markersGroup);
 
                 const popupContent = `
-                    <div style="min-width: 210px; max-width: 260px; font-family: system-ui, sans-serif;">
-                        <div class="flex items-center gap-2.5 mb-2">
-                            <img src="${ride.author_avatar}" class="w-7 h-7 rounded-full object-cover border border-white shadow">
-                            <div class="text-sm font-medium">${ride.author_username}</div>
+                    <div style="min-width: 180px; max-width: 230px; font-family: system-ui, sans-serif; line-height: 1.4;">
+                        <div class="flex items-center gap-2.5 mb-3">
+                            <img src="${ride.author_avatar}" class="w-7 h-7 rounded-full object-cover border border-white shadow-sm" alt="">
+                            <div class="text-sm font-medium text-slate-800">${ride.author_username}</div>
                         </div>
-                        <b style="font-size: 1.05rem; color: #0f172a;">${ride.title}</b>
                         
-                        ${ride.length_km ? `<div style="margin:6px 0; color:#0ea5e9; font-weight:600;">📏 ${ride.length_km} км</div>` : ''}
+                        <b style="font-size: 1.1rem; color: #0f172a; display: block; margin-bottom: 4px;">${ride.title}</b>
                         
-                        <p style="font-size:0.83rem; color:#64748b; line-height:1.35; margin:6px 0;">
-                            ${ride.description ? ride.description.substring(0, 110) + (ride.description.length > 110 ? '...' : '') : 'Без описания'}
+                        ${ride.length_km ? `<div style="color:#0ea5e9; font-weight:600; margin: 6px 0;">📏 ${ride.length_km} км</div>` : ''}
+                        
+                        <p style="font-size:0.85rem; color:#475569; margin: 8px 0;">
+                            ${ride.description ? ride.description.substring(0, 120) + (ride.description.length > 120 ? '...' : '') : 'Без описания'}
                         </p>
                         
-                        <a href="${ride.gpx_path}" download style="text-decoration:none;">
-                            <button style="width:100%; padding:9px; background:linear-gradient(to right,#22d3ee,#d946ef); color:white; border:none; border-radius:10px; cursor:pointer; font-weight:bold;">
+                        <a href="${ride.gpx_path}" download style="text-decoration: none; display: block; margin-bottom: 8px;">
+                            <button style="width:100%; padding:10px; background:linear-gradient(to right,#22d3ee,#d946ef); color:white; border:none; border-radius:10px; cursor:pointer; font-weight:600;">
                                 ↓ СКАЧАТЬ GPX
                             </button>
                         </a>
+
+                        <!-- Кнопка удаления — теперь всегда видна -->
+                        <button onclick="deleteRide(${ride.id})" 
+                                style="width:100%; padding:10px; background:#ef4444; color:white; border:none; border-radius:10px; cursor:pointer; font-weight:600;">
+                            🗑 Удалить маршрут
+                        </button>
                     </div>
                 `;
 
                 const popup = L.popup({
                     closeButton: true,
-                    autoPan: false,
+                    autoPan: true,
                     keepInView: true,
-                    offset: [0, -8]
+                    offset: [0, -10]
                 }).setContent(popupContent);
 
                 marker.bindPopup(popup);
 
                 marker.on('click', function() {
+                    if (currentTrack) map.removeLayer(currentTrack);
                     showTrack(ride.gpx_path, marker);
                 });
             });
+        }
+
+        function showTrack(gpxUrl, marker) {
+            if (currentTrack) map.removeLayer(currentTrack);
+
+            currentTrack = new L.GPX(gpxUrl, {
+                async: true,
+                marker_options: { startIconUrl: null, endIconUrl: null, shadowUrl: null },
+                polyline_options: { color: '#06b6d4', opacity: 0.85, weight: 5, lineCap: 'round' }
+            }).on('loaded', function(e) {
+                map.flyToBounds(e.target.getBounds(), {
+                    padding: [80, 100],
+                    maxZoom: 15,
+                    duration: 1
+                });
+
+                setTimeout(() => {
+                    marker.openPopup();
+                    setTimeout(showDeleteButtonIfAllowed, 400);
+                }, 800);
+            }).addTo(map);
+        }
+
+        async function deleteRide(rideId) {
+            if (!confirm("Вы уверены, что хотите удалить этот маршрут?\n\nЭто действие нельзя отменить.")) return;
+
+            try {
+                const res = await fetch(`/delete_ride/${rideId}`, {
+                    method: 'POST',
+                    credentials: 'include'
+                });
+                
+                const data = await res.json();
+                
+                if (data.success) {
+                    alert("✅ Маршрут успешно удалён");
+                    loadRides();
+                } else {
+                    alert(data.error || "Ошибка при удалении");
+                }
+            } catch (err) {
+                console.error(err);
+                alert("Ошибка соединения с сервером");
+            }
+        }
+
+        async function showDeleteButtonIfAllowed() {
+            const buttons = document.querySelectorAll('.delete-btn');
+            if (buttons.length === 0) return;
+
+            try {
+                const res = await fetch('/get_user_info', { credentials: 'include' });
+                const userData = await res.json();
+                
+                if (userData.error) return;
+
+                const isAdmin = userData.username === "admin";
+
+                buttons.forEach(btn => {
+                    const ownerId = parseInt(btn.dataset.ownerId || 0);
+                    if (isAdmin || ownerId === userData.user_id) {
+                        btn.style.display = "block";
+                    }
+                });
+            } catch(e) {
+                console.error("Не удалось проверить права", e);
+            }
         }
 
         function previewAndUploadAvatar(input) {
@@ -263,14 +338,12 @@
                 return;
             }
 
-            // Превью
             const reader = new FileReader();
             reader.onload = function(e) {
                 document.getElementById('user-avatar').src = e.target.result;
             };
             reader.readAsDataURL(file);
 
-            // Отправка на сервер
             const formData = new FormData();
             formData.append("avatar", file);
 
@@ -279,9 +352,7 @@
                 body: formData
             })
             .then(response => {
-                console.log("Upload response status:", response.status);
                 if (response.ok || response.redirected) {
-                    console.log("✅ Аватарка успешно загружена");
                     setTimeout(() => window.location.reload(), 800);
                 } else {
                     alert("Ошибка при загрузке аватарки");
